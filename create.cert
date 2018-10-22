@@ -1,0 +1,53 @@
+#!/bin/bash
+# based on https://github.com/cloudurable/cassandra-image/wiki/Cassandra-Tutorial-2:-Setting-up-client-and-cluster-SSL-transport-in-Cassandra
+
+cd /cert
+KEY_STORE_PATH="$PWD"
+KEY_STORE="$KEY_STORE_PATH/cassandra.keystore"
+TRUST_STORE="$KEY_STORE_PATH/cassandra.truststore"
+
+CLUSTER_PUBLIC_CERT="$KEY_STORE_PATH/CLUSTER_PUBLIC.cer"
+CLIENT_PUBLIC_CERT="$KEY_STORE_PATH/CLIENT_PUBLIC.cer"
+
+if test -z "$PASSWORD" 
+then
+  echo "ERROR no PASSWORD environment given"
+  exit 5
+fi
+
+if test -e "$CLUSTER_PUBLIC_CERT" 
+then
+  echo "ERROR Certificate already exists. Exiting"
+  exit 5
+fi
+
+### Cluster key setup.
+# Create the cluster key for cluster communication.
+keytool -genkey -sigalg SHA256withDSA --keysize 1024 -alias "CASSANDRA_CLUSTER" -storetype pkcs12 -keystore "$KEY_STORE" -storepass "$PASSWORD" -keypass "$PASSWORD" \
+-dname "CN=$CLUSTER_NAME server" -validity 36500
+
+# Create the public key for the cluster which is used to identify nodes.
+keytool -export -alias "CASSANDRA_CLUSTER" -file "$CLUSTER_PUBLIC_CERT" -keystore "$KEY_STORE" \
+-storepass "$PASSWORD" -keypass "$PASSWORD" -noprompt
+
+# Import the identity of the cluster public cluster key into the trust store so that nodes can identify each other.
+keytool -import -v -trustcacerts -alias "CASSANDRA_CLUSTER" -file "$CLUSTER_PUBLIC_CERT" -storetype pkcs12 -keystore "$TRUST_STORE" \
+-storepass "$PASSWORD" -keypass "$PASSWORD" -noprompt
+
+
+### Client key setup.
+# Create the client key for CQL.
+keytool -genkey -sigalg SHA256withDSA -keysize 1024 -alias "CASSANDRA_CLIENT" -keystore "$KEY_STORE" -storepass "$PASSWORD" -keypass "$PASSWORD" \
+-dname "CN=$CLUSTER_NAME client" -validity 36500
+
+# Create the public key for the client to identify itself.
+keytool -export -alias "CASSANDRA_CLIENT" -file "$CLIENT_PUBLIC_CERT" -keystore "$KEY_STORE" \
+-storepass "$PASSWORD" -keypass "$PASSWORD" -noprompt
+
+# Import the identity of the client pub  key into the trust store so nodes can identify this client.
+keytool -importcert -v -trustcacerts -alias "CASSANDRA_CLIENT" -file "$CLIENT_PUBLIC_CERT" -keystore "$TRUST_STORE" \
+-storepass "$PASSWORD" -keypass "$PASSWORD" -noprompt
+
+openssl pkcs12 -in "$KEY_STORE" -nokeys -out "$KEY_STORE_PATH/CLIENT.cer.pem" -passin pass:$PASSWORD
+openssl pkcs12 -in "$KEY_STORE" -nodes -nocerts -out "$KEY_STORE_PATH/CLIENT.key.pem" -passin pass:$PASSWORD
+

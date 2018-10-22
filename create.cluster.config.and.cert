@@ -1,0 +1,3 @@
+#!/bin/bash
+create.cluster.config
+create.cert
