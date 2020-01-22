@@ -5,5 +5,6 @@ COPY cassandra.yaml /etc/cassandra/cassandra.yaml
 COPY create.cert /usr/bin
 COPY create.cluster.config /usr/bin
 COPY create.cluster.config.and.cert /usr/bin
+RUN chmod a+x /usr/bin/create.cert /usr/bin/create.cluster.config /usr/bin/create.cluster.config.and.cert
 COPY logback.xml /etc/cassandra/logback.xml
 RUN tar czf /etc/cassandra.defaults.tgz -C /etc cassandra
